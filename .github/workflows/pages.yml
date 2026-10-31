@@ -81,6 +81,7 @@ jobs:
           echo "baseurl: ${BASEURL}" >> ${TEMP_CONFIG}
           echo "is_fork: ${IS_FORK}" >> ${TEMP_CONFIG}
           echo "fork_repository: ${BUILD_REPO}" >> ${TEMP_CONFIG}
+          echo "fork_owner: ${GITHUB_REPOSITORY_OWNER}" >> ${TEMP_CONFIG}
           echo "baseurl=${BASEURL} is_fork=${IS_FORK}"
 
           # allow override of everything

@@ -3,6 +3,13 @@ title: Introduction
 layout: default
 nav_order: 0
 ---
+{% if site.is_fork %}
+{: .note}
+> **This site is a fork** of the official [SAF specification](https://github.com/{{ site.canonical_repository }}), built from the [{{ site.fork_repository }}](https://github.com/{{ site.fork_repository }}) repository. It serves as the working base for the [SAF extension mechanism](https://github.com/{{ site.fork_repository }}/blob/main/saf-extension-modularization-plan.md) exercise — the pattern for extending SAF with new domains, aspects, and viewpoints. The official, up-to-date specification lives at [saf.gfse.org](https://saf.gfse.org).
+>
+> Want to try it yourself? Fork this repository and publish it on GitHub Pages — it renders on your personal account out of the box, see [Publishing your fork](https://github.com/{{ site.fork_repository }}#publishing-your-fork-on-github-pages) for the steps.
+{% endif %}
+
 # Introduction
 Inspired by the various enterprise architecture frameworks the System Architecture Framework (SAF) is a common, domain independent system architecture framework dedicated to support Model Based Systems Engineering (MBSE) of technical systems. 
 
@@ -31,9 +38,16 @@ The System Architecture Framework Specification application is demonstrated usin
 # Releases
 This documentation is for the main branch of SAF that reflects the current state of development and it is updated as required. See the [change report](CHANGES.md) for an information about major changes.
 
+{% if site.is_fork %}
+The released versions of SAF are available on the official documentation site at [{{ site.url }}]({{ site.url }}).
+{% else %}
+{% assign released = site.data.releases | where_exp: "item", "item.id != 'latest'" %}
+{% if released.size > 0 %}
 The following SAF releases are available, each of which is managed in a separate branch:
-{% for release in site.data.releases %}{% if release.id != "latest" %}* [{% if release.label %}{{ release.label }}{% else %}{{ release.id }}{% endif %}]({% if release.url %}{{ release.url }}{% else %}{{ site.url }}/version/{{ release.id }}{% endif %})
-{% endif %}{% endfor %}
+{% for release in released %}* [{% if release.label %}{{ release.label }}{% else %}{{ release.id }}{% endif %}]({% if release.url %}{{ release.url }}{% else %}{{ site.url }}/version/{{ release.id }}{% endif %})
+{% endfor %}
+{% endif %}
+{% endif %}
 
 
 # Tool Implementations

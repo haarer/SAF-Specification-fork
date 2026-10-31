@@ -73,7 +73,8 @@ jobs:
           # Project pages are served at https://<owner>.github.io/<repo-name>/,
           # so the baseurl must be the repository name - unless the site is
           # served from a custom domain (CNAME), where it lives at the root.
-          if [[ -f CNAME ]]; then BASEURL=""; else BASEURL="/${REPO_NAME,,}"; fi
+          # Pages URLs are case-sensitive: keep the repository name exactly as-is.
+          if [[ -f CNAME ]]; then BASEURL=""; else BASEURL="/${REPO_NAME}"; fi
           [[ -n "${TARGET_FOLDER}" ]] && BASEURL="${BASEURL}/version/${TARGET_FOLDER}"
 
           # The theme applies relative_url to site.logo, so only baseurl is injected here.

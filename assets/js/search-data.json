@@ -9290,21 +9290,21 @@
   },"1327": {
     "doc": "Imprint",
     "title": "Publisher",
-    "content": ". Gesellschaft für Systems Engineering e.V. - German Chapter of INCOSEHermann-Köhl-Straße 7 D-28199 BremenDeutschland Telefon: +49 (0) 421 9896639-0 e-mail: office(at)gfse.org Internet: www.gfse.org . Board of Directors . President: Dr.-Ing. Walter Koch Deputy President: Daria Wilke Treasurer: Ilona Hofmann Secretary: Stefan Dreiseitel . Registration Office . Amtsgericht München . Registration Number . VR 16037 . Responsible for the Content (§ 10 para. 3 MDStV) . Dr. Walter Koch, e-mail: office(at)gfse.org . ",
+    "content": "This site is a fork of the official SAF specification, built from the haarer/SAF-Specification-fork repository. The owner of the repository (haarer) is entirely responsible for the content of this site. The Gesellschaft für Systems Engineering e.V. (GfSE) is not responsible for the content of this fork. ",
     "url": "/SAF-Specification-fork/imprint.html#publisher",
     
     "relUrl": "/imprint.html#publisher"
   },"1328": {
     "doc": "Imprint",
     "title": "Data Protection and Privacy",
-    "content": " ",
+    "content": "Data processing on this site is the responsibility of the repository owner. ",
     "url": "/SAF-Specification-fork/imprint.html#data-protection-and-privacy",
     
     "relUrl": "/imprint.html#data-protection-and-privacy"
   },"1329": {
     "doc": "Imprint",
     "title": "Disclaimer",
-    "content": "This website contains links to external pages. External pages are not part of this site and their respective publishers are responsible for their content. We have carefully checked linked pages for illegal and offensive content. Still, we can neither warrant that we don't have overlooked anything, nor that the content has been changed, meanwhile. In case you find illegal or offensive content, please notify our webmaster. Thank you for your cooperation! . ",
+    "content": "This website contains links to external pages. External pages are not part of this site and their respective publishers are responsible for their content. The owner of the repository is entirely responsible for all content published on this fork. ",
     "url": "/SAF-Specification-fork/imprint.html#disclaimer",
     
     "relUrl": "/imprint.html#disclaimer"

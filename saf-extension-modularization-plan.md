@@ -27,6 +27,8 @@ Verified facts driving the design:
 - `userdoc/domains.md` and `userdoc/aspects.md` are data-driven loops with `<H2 id={{ element.ID }}>` (SysML-ID anchors, matching the grid's link style). The per-domain pages (`conceptual.md`, `operational.md`, …) and `devdoc/icons/readme.md` are hand-written/core-only.
 - Known core defect (pre-existing, out of scope): `viewpoint.md` builds domain/aspect links as `domains.html#<name>-domain` / `aspects.html#<name>-aspect` (name-based), but the anchors are SysML IDs → those two links are broken in the core site too. Extension VPs behave exactly like core VPs here.
 - Diagrams: `src/diagrams/` has 4 subdirectories — `concept/`, `examples_md/`, `examples_rhy/`, `examples_ea/` (331 SVGs); example rows reference them via `File` relative to `/diagrams/`.
+- Stakeholder rows carry `Rationales: [{Concern: <concern name string>, Rationale}]` — that array **is** the stakeholder's concern list, rendered in the "## Concern" section of `stakeholders.md`. There is no other surface to attach a concern to a stakeholder; extending a core stakeholder's list would require redeclaring the row with the same `ID` (duplicate H2 under append-only merging) → forbidden in v1 (uniform collision rule).
+- `realizeconcept.json` rows = `{RealizedConcept: {ID, Name}, RealizationOfConcept: {ID, Name}}` (concept realized by stereotype). Two render sites, both derived lookups: the VP page Profile Model Reference (`where: "RealizedConcept.ID", <exposed concept ID>` → appears on **every** VP page exposing that concept) and the Stereotypes page realized-concepts cell (`where: "RealizationOfConcept.ID", <row ID>` → appears in the row of **every** stereotype). A row touching a core record on either side therefore modifies core page rendering → v1 own-namespace rule (own concept **and** own stereotype only).
 - Jekyll loads nested `_data` folders: `src/_data/extensions/<name>/manifest.json` → `site.data.extensions.<name>.manifest`.
 - A Jekyll **generator runs before rendering**; mutating `site.data` in `generate()` is visible to all Liquid templates in the same build (JTD only reads `site.data.releases`, untouched). One code path in Ruby therefore replaces a Liquid merge include: it can tag rows, validate, and log warnings — Liquid can do none of that.
 - CI (`.github/workflows/pages.yml`) builds with `bundle exec jekyll build --destination build` → local `src/_plugins/` are loaded (no Gemfile change needed).
@@ -44,10 +46,10 @@ Every file in `src/_data/` was checked for content an extension could plausibly 
 | `mdexamples.json` | 94 | Cameo example models per VP | VP page example gallery |
 | `rhyexamples.json` | 70 | Rhapsody example models per VP | VP page example gallery |
 | `eaexamples.json` | 2 | EA example models per VP | VP page example gallery |
-| `stakeholders.json` | 21 | Stakeholder roles + rationales | Stakeholders page (H2 + anchor), VP page stakeholder list |
+| `stakeholders.json` | 21 | Stakeholder roles + rationales (concern list) | Stakeholders page (H2 + anchor), VP page stakeholder list — **new stakeholders only** (v1 collision rule: core stakeholders cannot be redeclared/extended) |
 | `concerns.json` | 146 | Concern records | VP page concern list; **no own page** (concerns.html is hand-written) |
 | `exposes.json` | 419 | "VP exposes concept X" rows | VP page Profile Model Reference list |
-| `realizeconcept.json` | 398 | "concept realized by stereotype Y" rows | VP page Profile Model Reference, Stereotypes page |
+| `realizeconcept.json` | 398 | "concept realized by stereotype Y" rows | VP page Profile Model Reference, Stereotypes page — **only own concepts + own stereotypes** (v1 own-namespace rule) |
 | `stereotypes.json` | 238 | SAF/SysML profile stereotypes | Stereotypes page table (anchor), VP page reference list |
 | `scmstereotypes.json` | 21 | SCM (development) stereotypes | Stereotypes page table (anchor), VP page reference list |
 | `special-implementations.json` | 45 | SCM patterns (TypedBy/ContainedIn/Attribute) | Stereotypes page table (anchor), VP page reference list |
@@ -107,7 +109,13 @@ Core rows carry no tag. Renderers test `row.ext_title` — one check, works for 
 
 **Consequence for core pages:** extension rows appear on the shared reference pages (Stakeholders, Stereotypes, devdoc/concepts) *with a badge* — that is the point: an extension's stakeholders/stereotypes/concepts are discoverable in one place. The core **grid** gains rows/columns for extension domains/aspects (colored row, dot-marked cells, badge-marked page entries) — additive growth, core cells untouched. In v1, core **viewpoint** pages are never modified by extensions (cross-reference rule below).
 
-**v1 cross-reference rule (open decision, see grill Q1):** extension example rows must reference the extension's own VPs (`ExampleForVPID` ∈ extension VP IDs) and extension expose rows must reference the extension's own VPs (`Viewpoint.Name` ∈ extension VP names). Rows violating the rule are skipped with a build warning. This keeps core VP pages content-identical to the core site (only nav/grid/index/sidebar may differ).
+**v1 reference & collision rules (open decision, see grill Q1):**
+- **Uniform collision rule (no redeclaration)** — extensions are additive: a row that redeclares an existing record (core or an earlier extension) is skipped with a build warning. Identity keys: viewpoints `Name` + `VP_ID`, stakeholders `ID`, concerns `ID`, stereotypes & scmstereotypes `Name`, special-implementations the (Stereotype, Client, Supplier) triple, concepts `ID`, domains `DomainID`, aspects `AspectID`.
+- **Own-namespace rules** — example rows must reference the extension's own VPs (`ExampleForVPID` ∈ extension VP IDs); expose rows must reference the extension's own VPs (`Viewpoint.Name` ∈ extension VP names; the exposed concept may be core or own — it renders only on the extension VP pages); realizeconcept rows must reference the extension's own concepts (`RealizedConcept`) **and** its own stereotypes (`RealizationOfConcept`) — a row touching a core record on either side would appear on core VP pages or in core stereotype rows.
+- **Consequence — stakeholders:** an extension cannot extend a core stakeholder's concern list (`Rationales`): a new extension concern renders on the extension's VP pages (name + badge) but does **not** appear under existing core stakeholders on the Stakeholders page. If the extension needs a stakeholder role carrying those concerns, it declares a new stakeholder (new `ID`) and references it from its VPs.
+- **Consequence — realizeconcept:** an extension cannot add realizations for core concepts nor realize its own concepts with core stereotypes; such rows are skipped with a build warning (the link may be noted in the concept's `Documentation`).
+
+Together these keep core VP pages content-identical to the core site (only nav/grid/index/sidebar may differ) and keep core rows on the shared reference pages free of extension data.
 
 ## Design summary
 
@@ -131,10 +139,12 @@ The `_plugins/` directory does not exist yet — create it. Runs after the page 
 # SAF extension mechanism.
 #
 # For every extension directory src/_data/extensions/<name>/:
-#   1. merges its JSON data tables into the core _data tables, tags every
-#      extension row with its origin (ext_name / ext_title / ext_color) and
-#      publishes the merged result under site.data["ext_<table>"] (templates
-#      read those keys; identity when no extension exists),
+#   1. merges its JSON data tables into the core _data tables, validates the
+#      v1 reference & collision rules (violating rows are skipped with a
+#      build warning), tags every kept row with its origin (ext_name /
+#      ext_title / ext_color) and publishes the merged result under
+#      site.data["ext_<table>"] (templates read those keys; identity when
+#      no extension exists),
 #   2. generates one overview page (extensions/<name>.html) and one page per
 #      viewpoint record (userdoc/<Domain> Domain/<Name>.html — same URL
 #      scheme as core pages).
@@ -160,7 +170,6 @@ class SafExtensionsGenerator < Jekyll::Generator
     return if exts.nil? || exts.empty?
 
     existing_urls = site.pages.map { |p| p.url.to_s }
-    known_titles  = site.pages.map { |p| p.data["title"].to_s }.reject(&:empty?)
     ext_index = 0
 
     exts.sort_by { |name, _| name.to_s }.each do |name, files|
@@ -192,13 +201,37 @@ class SafExtensionsGenerator < Jekyll::Generator
         Jekyll.logger.warn("saf-extensions", "extension '#{name}': no viewpoints.json entries - overview page only")
       end
 
-      # ---- grid structure: DomainID/AspectID must be unique (core + all
-      #      previously merged extensions)
-      taken_domain_ids = site.data["ext_domains"].map { |d| d["DomainID"].to_s }
-      taken_aspect_ids = site.data["ext_aspects"].map { |a| a["AspectID"].to_s }
-      hex_color        = color.delete_prefix("#")
+      # ---- v1 reference & collision rules (see userdoc/extensions.html):
+      #      - uniform collision rule: a row that redeclares an existing
+      #        record (core + earlier extensions) is skipped with a warning
+      #      - own-namespace rules: examples/exposes -> own VPs,
+      #        realizeconcept -> own concepts + own stereotypes
+      identity_keys = { "viewpoints" => %w[Name VP_ID], "stakeholders" => %w[ID],
+                        "concerns" => %w[ID], "stereotypes" => %w[Name],
+                        "scmstereotypes" => %w[Name], "concepts" => %w[ID],
+                        "domains" => %w[DomainID], "aspects" => %w[AspectID] }
+      taken = {}
+      identity_keys.each do |t, keys|
+        taken[t] = site.data["ext_#{t}"].flat_map do |row|
+          next unless row.is_a?(Hash)
+          keys.map { |k| row[k].to_s }.reject(&:empty?)
+        end
+      end
+      taken["special-implementations"] = site.data["ext_special-implementations"].map do |row|
+        next unless row.is_a?(Hash)
+        [row["Stereotype"].to_s, (row["Client"] || {})["Name"].to_s,
+         (row["Supplier"] || {})["Name"].to_s]
+      end.compact
+      own_concept_ids = Array(files["concepts"]).select { |r| r.is_a?(Hash) }
+                                .map { |r| r["ID"].to_s }.reject(&:empty?)
+      own_stereo_ids  = %w[stereotypes scmstereotypes special-implementations].flat_map do |t|
+        Array(files[t]).select { |r| r.is_a?(Hash) }.map { |r| r["ID"].to_s }
+      end.reject(&:empty?)
+      new_domain_ids = []
+      skipped_vp_rows = []
+      hex_color      = color.delete_prefix("#")
 
-      # ---- data merge: tag rows + v1 cross-reference rule
+      # ---- data merge: validate v1 rules, tag rows
       TABLES.each do |t|
         rows = files[t]
         next unless rows.is_a?(Array)
@@ -207,21 +240,24 @@ class SafExtensionsGenerator < Jekyll::Generator
             Jekyll.logger.warn("saf-extensions", "extension '#{name}': #{t}.json record #{i} is not an object - skipped")
             next
           end
-          if t == "domains"
-            did = row["DomainID"].to_s
-            if did.empty? || taken_domain_ids.include?(did)
-              Jekyll.logger.warn("saf-extensions", "extension '#{name}': domains.json record #{i} DomainID '#{did}' is missing or collides with an existing domain - skipped")
+          if (keys = identity_keys[t])
+            row_keys = keys.map { |k| row[k].to_s }.reject(&:empty?)
+            if row_keys.any? { |v| taken[t].include?(v) }
+              Jekyll.logger.warn("saf-extensions", "extension '#{name}': #{t}.json record #{i} redeclares an existing record (#{keys.map { |k| k + '=' + row[k].to_s }.join(', ')}) - skipped (v1 collision rule)")
+              skipped_vp_rows << row if t == "viewpoints"
               next
             end
-            taken_domain_ids << did
+            row_keys.each { |v| taken[t] << v }
+            new_domain_ids << row["DomainID"].to_s if t == "domains"
           end
-          if t == "aspects"
-            aid = row["AspectID"].to_s
-            if aid.empty? || taken_aspect_ids.include?(aid)
-              Jekyll.logger.warn("saf-extensions", "extension '#{name}': aspects.json record #{i} AspectID '#{aid}' is missing or collides with an existing aspect - skipped")
+          if t == "special-implementations"
+            triple = [row["Stereotype"].to_s, (row["Client"] || {})["Name"].to_s,
+                      (row["Supplier"] || {})["Name"].to_s]
+            if taken["special-implementations"].include?(triple)
+              Jekyll.logger.warn("saf-extensions", "extension '#{name}': special-implementations.json record #{i} redeclares an existing implementation - skipped (v1 collision rule)")
               next
             end
-            taken_aspect_ids << aid
+            taken["special-implementations"] << triple
           end
           if EXAMPLES.include?(t) && !ext_vp_ids.include?(row["ExampleForVPID"].to_s)
             Jekyll.logger.warn("saf-extensions", "extension '#{name}': #{t}.json record #{i} references '#{row['ExampleForVPID']}' - not a viewpoint of this extension, skipped (v1 rule)")
@@ -234,6 +270,14 @@ class SafExtensionsGenerator < Jekyll::Generator
               next
             end
           end
+          if t == "realizeconcept"
+            rc = (row["RealizedConcept"] || {})["ID"].to_s
+            ro = (row["RealizationOfConcept"] || {})["ID"].to_s
+            unless own_concept_ids.include?(rc) && own_stereo_ids.include?(ro)
+              Jekyll.logger.warn("saf-extensions", "extension '#{name}': realizeconcept.json record #{i} must reference this extension's own concept and own stereotype - skipped (v1 rule)")
+              next
+            end
+          end
           site.data["ext_#{t}"] << row.merge(tag)
         end
       end
@@ -243,7 +287,7 @@ class SafExtensionsGenerator < Jekyll::Generator
       #      missing rows fall back to the extension's color, core format
       #      = hex without '#')
       merged_dc_ids = site.data["ext_domaincolors"].map { |d| d["DomainID"].to_s }
-      taken_domain_ids.each do |did|
+      new_domain_ids.each do |did|
         next if did.empty? || merged_dc_ids.include?(did)
         site.data["ext_domaincolors"] << { "DomainID" => did, "Color" => hex_color }.merge(tag)
       end
@@ -281,6 +325,7 @@ class SafExtensionsGenerator < Jekyll::Generator
       # ---- viewpoint pages: userdoc/<Domain>/<Name>.html (same scheme as core)
       vps.each_with_index do |vp, i|
         next unless vp.is_a?(Hash)
+        next if skipped_vp_rows.include?(vp)
         vp_name = vp["Name"].to_s
         domain = vp["Domain"].to_s
         if vp_name.empty? || domain.empty?
@@ -296,14 +341,10 @@ class SafExtensionsGenerator < Jekyll::Generator
           Jekyll.logger.warn("saf-extensions", "extension '#{name}': skipping '#{vp_name}': #{url} is already taken by an existing page")
           next
         end
-        if known_titles.include?(vp_name)
-          Jekyll.logger.warn("saf-extensions", "extension '#{name}': viewpoint Name '#{vp_name}' is not unique across the site - the by-Name lookup in viewpoint.md may resolve to the wrong record")
-        end
         add_page(site, "userdoc/#{domain}", "#{vp_name}.html",
                  { "title" => vp_name, "parent" => title, "layout" => "default", "nav_order" => base + 10 + i * 10 },
                  "{% include viewpoint.md %}")
         existing_urls << url
-        known_titles << vp_name
       end
     end
   end
@@ -318,7 +359,7 @@ end
 
 Behavior notes:
 
-- **Collision**: a generated page whose URL already exists (core wrapper or another extension's page) is skipped with a warning; the existing page wins. Overriding a core viewpoint in your fork = delete the core wrapper file in your fork (explicit, visible in the fork diff) — the extension record then generates the page at the same URL.
+- **Collision**: two levels. (1) Merge phase: a row whose identity collides with an existing record (viewpoints `Name`/`VP_ID`, stakeholders/concepts `ID`, stereotypes/scmstereotypes `Name`, special-implementations triple, domains `DomainID`, aspects `AspectID`) is skipped with a warning before any page is generated (v1 collision rule). (2) Page phase: a generated page whose URL already exists (core wrapper or another extension's page) is skipped with a warning; the existing page wins. Overriding a core viewpoint in your fork = delete the core wrapper file in your fork (explicit, visible in the fork diff) — the extension record then generates the page at the same URL.
 - **Nav**: all pages of one extension share `parent` = `manifest.title` → one JTD sidebar section per extension. `nav_order` base `200 + (ext_index-1)*1000` sorts extension sections after the core sections (core sections start at nav_order 0–90).
 - **Merged keys**: `site.data.ext_viewpoints`, …, `site.data.ext_concepts`. The dashed key is read in Liquid as `site.data['ext_special-implementations']` (bracket syntax).
 - **`instance_variable_set(:@content, …)`**: generator-created pages have no file on disk; works regardless of `Page#content` writer visibility (Jekyll 4.x per the fork Gemfile). Validation step 3 proves the pages render end-to-end.
@@ -431,9 +472,9 @@ Front matter: `title: Extensions`, `layout: default`, `nav_order: 87` (between C
 6. **Marking** — every extension contribution renders with a colored badge naming the extension (page heading, reference-table rows, grid dots, index dots, colored grid row for new domains). Choose a distinctive `color` in the manifest; the default palette is assigned automatically.
 7. **Rendering** — one page per VP record at `/userdoc/<Domain> Domain/<Name>.html` (same URL scheme as core pages, so existing relative links keep working); one overview page per extension at `/extensions/<name>.html`; a sidebar section per extension; extension VPs appear in the SAF grid cell of their domain/aspect (marked with a dot); the index lists the extensions; generated pages are included in site search.
 8. **Rules & limitations (v1)** —
-   - **Cross-reference rule**: example rows must reference the extension's own VPs; expose rows must reference the extension's own VPs. Violations are skipped with a build warning. (Extension stakeholders/stereotypes/concepts referenced *by* extension VPs are fine — they render on the shared reference pages with badges.)
-   - VP `Name`s must be unique across the site; a record whose page path collides with an existing page is skipped with a build warning (override a core VP by deleting its wrapper file in your fork).
-   - `DomainID`/`AspectID` must be unique across core and all extensions; colliding rows are skipped with a build warning.
+   - **Collision rule (no redeclaration)**: extensions are additive. A row that redeclares an existing record (core or an earlier extension) is skipped with a build warning. Identity keys: viewpoints `Name` + `VP_ID`, stakeholders `ID`, concerns `ID`, stereotypes & scmstereotypes `Name`, special-implementations the (Stereotype, Client, Supplier) triple, concepts `ID`, domains `DomainID`, aspects `AspectID`. In particular, a core stakeholder cannot be redeclared to extend its concern list — a new extension concern appears on the extension's VP pages (badge) but not under an existing core stakeholder on the Stakeholders page; if the extension needs a stakeholder role carrying those concerns, it declares a new stakeholder (new `ID`) and references it from its VPs.
+   - **Own-namespace rule**: example rows must reference the extension's own VPs; expose rows must reference the extension's own VPs (the exposed concept may be core — it renders only on the extension's VP pages); realizeconcept rows must reference the extension's own concept **and** its own stereotype — a row touching a core record on either side would otherwise appear on core VP pages or in core stereotype rows. Violations are skipped with a build warning. (Extension stakeholders/stereotypes/concepts referenced *by* extension VPs are fine — they render on the shared reference pages with badges.)
+   - VP page paths: a record whose page path collides with an existing page is skipped with a build warning (override a core VP by deleting its wrapper file in your fork).
    - Only userdoc domains are supported — records with `Domain: "SAF Development"` are skipped (dev VPs need `standard-mapping`/concept-diagram data, future work).
    - The hand-written per-domain pages (`conceptual.md` etc.) and the icon guide stay core-only; extension domains render on the data-driven Domains page.
    - Extensions are additive — they never modify core content in v1; core viewpoint pages render exactly as on saf.gfse.org.
@@ -489,8 +530,9 @@ All builds run in the fork (`bundle install` first if gems are missing).
    - Core reference pages: Stakeholders/Stereotypes/devdoc-concepts rows carry **no** badge (all core rows untagged); page content otherwise unchanged.
    - All other pages byte-identical to `build-baseline` (differences only: the 5 C7 pages, `index.html`, new `extensions/` files).
    - Cross-link anchors resolve: `stakeholders.html` has the Security Expert / System Architect IDs; `concerns.html` has the C7 concern IDs; `stereotypes.html` has the IDs referenced by the C7 expose rows.
-   - **Collision policy**: temporarily add `src/_data/extensions/scratch/` (manifest `name: scratch`, `title: Scratch`; one viewpoints record `Name: "Security Context Viewpoint"`, `Domain: "Conceptual"`) → build → log has the "already taken" warning; the C7 page unchanged → delete the scratch directory.
-   - **Cross-reference rule**: temporarily extend `scratch` with an `exposes.json` row referencing a core VP name and an `mdexamples.json` row with a core `ExampleForVPID` → build → both rows warned + absent from `ext_*` merges (core VP page content unchanged) → delete.
+   - **Collision policy**: temporarily add `src/_data/extensions/scratch/` (manifest `name: scratch`, `title: Scratch`; one viewpoints record `Name: "Security Context Viewpoint"`, `Domain: "Conceptual"`) → build → log has the merge-phase redeclaration warning (viewpoints `Name` collision); no scratch page is generated; the C7 pages unchanged. Keep the scratch directory for the next two tests.
+   - **Cross-reference rule**: extend the same scratch extension with an `exposes.json` row referencing a core VP name and an `mdexamples.json` row with a core `ExampleForVPID` → build → both rows warned + absent from `ext_*` merges (core VP page content unchanged).
+   - **Collision & own-namespace rules**: extend the scratch extension with (a) a `stakeholders.json` row reusing the `ID` of a core stakeholder, (b) a `concepts.json` row reusing a core concept `ID`, (c) a `realizeconcept.json` row with a core `RealizedConcept` and the extension's own `RealizationOfConcept`, (d) a `realizeconcept.json` row with the extension's own new concept but a core `RealizationOfConcept` → build → all four rows warned + absent from the `ext_*` merges; the Stakeholders page has no duplicate H2; the Profile Model Reference on core VP pages and the realized-concepts cell of core stereotype rows are unchanged → delete the scratch directory.
    - **Grid structure**: temporarily add `src/_data/extensions/gridtest/` (manifest `name: gridtest`, `title: Grid Test`, `color: "#123456"`; `domains.json` one row — DomainID `X`, unique `ID`, `Documentation`; `aspects.json` one row — AspectID `9`; `domaincolors.json` one row — `{DomainID: "X", Color: "123456"}`; `viewpoints.json` one row — `Domain`/`Aspect` = the new names, Exposure `BlackBox`, no concerns) → build → the grid has a new `X` row with inline `background-color: #123456` and a new last column; the new VP page renders badge-marked at `userdoc/<Domain> Domain/<Name>.html`; `domains.html` / `aspects.html` have the badge-marked H2 entries → delete the scratch directory. Then add a second scratch extension `gridtest2` with a `domains.json` row but **no** `domaincolors.json` row → its grid row falls back to its palette color (auto-fill) → delete.
 4. **Serve**: `bundle exec jekyll serve --port 4000` → in a browser: open `/` (Extensions section with dot, grid dots hover); open `/extensions/saf-security.html`; open the Security Context page — badge visible next to the heading, nav section, maturity badge image, example gallery, stakeholder/concern links resolve, `examplegallery.js` loads from the baseurl-scoped path.
 
@@ -502,7 +544,7 @@ All builds run in the fork (`bundle install` first if gems are missing).
 
 ## Assumptions & limitations
 
-- **Cross-reference rule (open — grill Q1)**: in v1, extension examples/exposes reference only the extension's own VPs; violations are skipped with a build warning. If the decision goes the other way, delete the two filter blocks in the generator — but then core VP pages gain content (badges on profile-model-reference items and gallery items would also need adding, currently out of scope).
+- **v1 reference & collision rules (open — grill Q1)**: extension rows are additive — no redeclaration of existing records (identity keys per table), examples/exposes reference only the extension's own VPs, realizeconcept rows only the extension's own concepts + own stereotypes; violations are skipped with a build warning. If the decision goes the other way (allow annotating core records), the generator's filter blocks go away — but then core VP pages gain content (badges on profile-model-reference items and gallery items would also need adding, currently out of scope), core stakeholder rows gain concern entries, and core stereotype rows gain realized-concept entries.
 - v1 is **additive**: extensions add pages and reference-table rows (badge-marked); core viewpoint pages stay content-identical. Overriding a core VP in a fork is possible (delete its wrapper) but is a fork-local decision.
 - v1 supports **userdoc domains only**; `Domain: "SAF Development"` records are skipped with a warning (dev VPs need `standard-mapping`/concept-diagram tables — future work, would also merge those 4 tables and badge `dev-viewpoint.md`).
 - Extension VPs may use **new** domains/aspects defined by the extension: unique `DomainID`/`AspectID` (collision → skipped with a build warning), grid row colored from the extension's `domaincolors.json` row (auto-filled with the extension's color if omitted), badge-marked entries on the data-driven Domains/Aspects pages. Core domain rows/columns stay untouched (hard-coded CSS classes, no inline styles).

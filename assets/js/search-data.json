@@ -9374,7 +9374,7 @@
   },"1339": {
     "doc": "Introduction",
     "title": "Introduction",
-    "content": "This site is a fork of the official SAF specification, built from the haarer/SAF-Specification-fork repository. It serves as the working base for the SAF extension mechanism exercise — the pattern for extending SAF with new domains, aspects, and viewpoints. The official, up-to-date specification lives at saf.gfse.org. Want to try it yourself? Fork this repository and publish it on GitHub Pages — it renders on your personal account out of the box, see Publishing your fork for the steps. ",
+    "content": "This site is a fork of the official SAF specification, built from the haarer/SAF-Specification-fork repository. The owner of the repository is responsible for the content of this fork. The official, up-to-date specification lives at https://saf.gfse.org. ",
     "url": "/SAF-Specification-fork/",
     
     "relUrl": "/"
